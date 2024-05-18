@@ -2,10 +2,16 @@ import boto3
 
 def create_vpc(config):
     ec2_client = boto3.client('ec2')
-    vpc_response = ec2_client.create_vpc(CidrBlock=config['cidr_block'])
-    vpc = vpc_response['Vpc']
-    print(f"VPC Created with ID: {vpc['VpcId']}")
-    return vpc
+    try:
+        vpc_response = ec2_client.create_vpc(CidrBlock=config['cidr_block'])
+        vpc = vpc_response['Vpc']
+        # Enable DNS support and DNS hostnames
+        ec2_client.modify_vpc_attribute(VpcId=vpc['VpcId'], EnableDnsSupport={'Value': True})
+        ec2_client.modify_vpc_attribute(VpcId=vpc['VpcId'], EnableDnsHostnames={'Value': True})
+        print(f"VPC Created with ID: {vpc['VpcId']}, DNS support and hostnames enabled.")
+        return vpc
+    except Exception as e:
+        print(f"Failed to create VPC: {e}")
 
 def create_subnets(vpc_id):
     ec2_client = boto3.client('ec2')
@@ -46,9 +52,11 @@ def create_db_subnet_group(description, name, subnet_ids):
             SubnetIds=subnet_ids
         )
         print(f"DB Subnet Group Created with Name: {name}")
-        return response['DBSubnetGroup']
+        return name  # Directly return the name of the DB subnet group
     except Exception as e:
         print(f"Failed to create DB subnet group: {e}")
+        return None
+
 
 def create_and_attach_internet_gateway(ec2_client, vpc_id):
     igw = ec2_client.create_internet_gateway()
@@ -87,8 +95,8 @@ def create_rds_instance(config, db_subnet_group_name, security_group_id):
             AllocatedStorage=config['allocated_storage'],
             DBInstanceClass=config['instance_class'],
             Engine=config['engine'],
-            MasterUsername='admin',
-            MasterUserPassword='nanditasolacedb',  # my db password - Acknowledging  this is not a best practice in prod
+            MasterUsername=config['username'],  # Use username from config
+            MasterUserPassword=config['password'],  # Use password from config - Acknowledging this is not PROD recommended practice
             DBSubnetGroupName=db_subnet_group_name,
             VpcSecurityGroupIds=[security_group_id],
             MultiAZ=False,
@@ -100,6 +108,7 @@ def create_rds_instance(config, db_subnet_group_name, security_group_id):
     except Exception as e:
         print(f"Failed to create RDS instance: {e}")
 
+
 def apply_configuration(config):
     print("Applying configuration...")
     ec2_client = boto3.client('ec2')
@@ -109,13 +118,16 @@ def apply_configuration(config):
         subnet_ids = create_subnets(vpc['VpcId'])
         ec2_sg = create_security_group(vpc['VpcId'], 'Security group for EC2 instances', 'ec2')
         rds_sg = create_security_group(vpc['VpcId'], 'Security group for RDS instances', 'rds')
-        db_subnet_group = create_db_subnet_group('Subnet group for RDS instances', 'NanditaDBSubnetGroup', subnet_ids)
+        db_subnet_group_name = create_db_subnet_group('Subnet group for RDS instances', 'NanditaDBSubnetGroup', subnet_ids)
         igw_id = create_and_attach_internet_gateway(ec2_client, vpc['VpcId'])
         update_route_tables(ec2_client, vpc['VpcId'], igw_id)
     if 'ec2' in aws_resources:
         instance = create_ec2_instance(aws_resources['ec2'], subnet_ids[0], ec2_sg)
-    if 'rds' in aws_resources:
-        db_instance = create_rds_instance(aws_resources['rds'], db_subnet_group['DBSubnetGroupName'], rds_sg)
+    if 'rds' in aws_resources and db_subnet_group_name:
+        db_instance = create_rds_instance(aws_resources['rds'], db_subnet_group_name, rds_sg)
+    else:
+        print("Skipping RDS instance creation due to missing DB subnet group.")
     print("Configuration application complete.")
+
 
 
