@@ -1,2 +1,0 @@
-import boto3
-from aws_manager.nandita_1_vpc import create_vpc
