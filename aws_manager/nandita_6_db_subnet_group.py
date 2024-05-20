@@ -8,3 +8,5 @@ def create_db_subnet_group(description, name, subnet_ids): #networking element 6
         return name
     except Exception as error:
         print(f"Failed to create DB subnet group. Error: {error}")
+
+

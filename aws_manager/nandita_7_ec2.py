@@ -8,3 +8,6 @@ def create_ec2_instance(config, subnet_id, security_group_id):
         return instance
     except Exception as error:
         print(f"Failed to create EC2 instance. Error: {error}")
+
+
+
