@@ -9,6 +9,8 @@ from aws_manager.nandita_7_ec2 import create_ec2_instance
 from aws_manager.nandita_8_rds import create_rds_instance
 
 
+
+
 def apply_configuration(config):
     print("Applying Nandita's configuration...")
     ec2_client = boto3.client('ec2')
@@ -28,3 +30,4 @@ def apply_configuration(config):
     else:
         print("Skipping RDS instance creation due to issues with DB subnet group or other dependencies.")
     print("Yay!! Nandita's Configuration application complete.")
+
